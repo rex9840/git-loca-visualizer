@@ -12,8 +12,8 @@ func scan(path string) {
 	fmt.Printf("%s\n", repo)
         filePath:=handler.GetDotfilePath()
         fmt.Printf("%s\n",filePath)
-        
-        
+        handler.AddNewSliceToFile(filePath,repo)
+        fmt.Printf("... Added to %s file\n",filePath)        
 }
 
 func stats(email string) {

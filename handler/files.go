@@ -3,10 +3,11 @@ package handler
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"os"
-	"os/user"
-        "path/filepath"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,61 +15,98 @@ func RecursivelyScanFolder(folder string) []string {
 	return gitScanFolder(make([]string, 0), folder)
 }
 
-func AddNewSlicePath(filePath string, newRepo []string) {
+func AddNewSliceToFile(filePath string, newRepo []string) {
+	existingRepos := parseFileLinesToString(filePath)
+	repos := joinRepos(newRepo, existingRepos)
+	dunpStringToFile(repos, filePath)
+}
+
+func dunpStringToFile(stringSlice []string, filePath string) {
+	content := strings.Join(stringSlice, " \n")
+	ioutil.WriteFile(filePath, []byte(content), 0755)
+
+}
+
+func joinRepos(fromR []string, toR []string) []string {
+	return JoinSlice(fromR, toR)
+}
+
+func JoinSlice(fromS []string, toS []string) []string {
+	for _, sliceValue := range fromS {
+		for _, value := range toS {
+			if sliceValue != value {
+
+				toS = append(toS, sliceValue)
+
+			}
+		}
+	}
+
+	return toS
 }
 
 func GetDotfilePath() string {
-	usr, err := user.Current()
+	// usr, err := user.Current()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// dotFile := usr.HomeDir + "/.gogitlocalstatus"
+
+	currentDir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
-	dotFile := usr.HomeDir + "/.gogitlocalstatus"
-
+	dotFile := filepath.Join(currentDir, ".gogitlocalstatus")
 	return dotFile
 
 }
 
+func parseFileLinesToString(filePath string) []string {
+	filePtr, err := os.Open(filePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer filePtr.Close()
+	var lines []string
+	scanner := bufio.NewScanner(filePtr)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
 
-func getIgnorefile()[]string{
-        currenDir,err:= os.Getwd() 
-        if err != nil { 
-                log.Fatal(err) 
-        }
-        filePath:= filepath.Join(currenDir,"handler/.ignore")
-        filePtr,err := os.Open(filePath)
-        if err != nil {
-                log.Fatal(err)
-        } 
-         
-        var ignoreList []string
-        
-        scanner := bufio.NewScanner(filePtr)
-        for scanner.Scan() { 
-                line:= strings.TrimSpace(scanner.Text())
-                if line != "" {
-                        ignoreList = append(ignoreList,line) 
-                }
+	if err := scanner.Err(); err != nil {
+		if err != io.EOF {
+			panic(err)
+		}
+	}
 
-        }
-        
-        return ignoreList
+	return lines
 }
 
-
-func shouldIgnorefile(fileName string )bool{
-        for _ , ignore := range getIgnorefile(){
-                matched, err := filepath.Match(ignore, fileName)
-                if err != nil {
-                        log.Fatal(err)
-                } 
-                if matched { 
-                        fmt.Println("... Ignoring file ",fileName)
-                        return true
-                } 
-        }
-        return false
+func getIgnorefile() []string {
+	currenDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	filePath := filepath.Join(currenDir, "handler/.ignore")
+	return parseFileLinesToString(filePath)
 }
 
+func shouldIgnorefile(fileName string) bool {
+	for _, ignore := range getIgnorefile() {
+		matched, err := filepath.Match(ignore, fileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if matched {
+			fmt.Println("... Ignoring file ", fileName)
+			return true
+		}
+	}
+	return false
+}
 
 func gitScanFolder(folders []string, folder string) []string {
 	folder = strings.TrimSuffix(folder, "/")
@@ -96,15 +134,14 @@ func gitScanFolder(folders []string, folder string) []string {
 				fmt.Printf("%s\n", folder)
 				continue
 			}
-                        
-                        if shouldIgnorefile(file.Name()){
-                                continue 
-                        }
+
+			if shouldIgnorefile(file.Name()) {
+				continue
+			}
 
 			folders = gitScanFolder(folders, path)
-                        
-                
-		}  
+
+		}
 
 	}
 
