@@ -22,10 +22,10 @@ func AddNewSliceToFile(filePath string, newRepo []string) {
 }
 
 func dunpStringToFile(stringSlice []string, filePath string) {
-        fmt.Println("... Writing to file")
-        fmt.Println(stringSlice)
+	fmt.Println("... Writing to file")
+	fmt.Println(stringSlice)
 	content := strings.Join(stringSlice, " \n")
-        fmt.Println(content)
+	fmt.Println(content)
 	ioutil.WriteFile(filePath, []byte(content), 0755)
 
 }
@@ -35,23 +35,18 @@ func joinRepos(fromR []string, toR []string) []string {
 }
 
 func JoinSlice(fromS []string, toS []string) []string {
-        if len(toS)==0 {
-                return fromS 
-        }
-	for _, sliceValue := range fromS { 
-		for _, value := range toS {
-                        println(value)
+	println(len(fromS))
+	println(len(toS))
+	for _, value := range toS {
+		for _, sliceValue := range fromS {
 			if sliceValue != value {
-
-				toS = append(toS, sliceValue)
+				toS = append(fromS, sliceValue)
 
 			}
 		}
+		break
 	}
-
-        fmt.Println(toS)
-
-	return toS
+	return fromS
 }
 
 func GetDotfilePath() string {
@@ -76,9 +71,10 @@ func parseFileLinesToString(file string) []string {
 		if os.IsNotExist(err) {
 			fmt.Println("... Creating file ", file)
 			filePtr, err = os.Create(file)
-		} 
+			return []string{}
+		}
 		if err != nil {
-                        log.Fatal(err)
+			log.Fatal(err)
 		}
 	}
 	defer filePtr.Close()

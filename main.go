@@ -18,6 +18,7 @@ func scan(path string) {
 
 func stats(email string) {
 	println("stats")
+        fmt.Println(handler.CalculateOffset())
 	println(email)
 
 }
