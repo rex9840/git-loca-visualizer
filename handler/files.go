@@ -44,7 +44,6 @@ func JoinSlice(fromS []string, toS []string) []string {
 
 			}
 		}
-		break
 	}
 	return fromS
 }

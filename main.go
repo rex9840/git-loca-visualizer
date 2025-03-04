@@ -18,7 +18,6 @@ func scan(path string) {
 
 func stats(email string) {
 	println("stats")
-        fmt.Println(handler.CalculateOffset())
 	println(email)
 
 }
@@ -36,5 +35,9 @@ func main() {
 	if folder != "" {
 		scan(folder)
 	}
+        
+        if email != "" {
+                stats(email)
+        }
 
 }
