@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"time"
+
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
@@ -27,22 +28,18 @@ func GetFillCommits(email, path string, commits map[int]int) map[int]int {
 	errorPanic(err)
 
 	offset := calculateOffset() // 0..6, Sunday=0
-
 	now := getBeginningOfDay(time.Now())
-	limit := daysInLastSixMonths()
+	limit := daysInLastSixMonths() // cutoff
 
 	err = iter.ForEach(func(c *object.Commit) error {
-		// Normalize commit time to beginning of day in the same location as now
+		// Normalize to local midnight (same location as now)
 		d := getBeginningOfDay(c.Author.When.In(now.Location()))
-		daysAgo := int(now.Sub(d).Hours() / 24) // negative => future; positive => past
+		daysAgo := int(now.Sub(d).Hours() / 24) // <0 => future; >limit => too old
 
-		// outside the window?
 		if daysAgo < 0 || daysAgo > limit {
 			return nil
 		}
-
 		if c.Author.Email == email {
-			// Shift by weekday so rows/columns align like a contributions calendar
 			key := daysAgo + offset
 			commits[key]++
 		}
@@ -130,20 +127,25 @@ func printCell(val int, today bool) {
 }
 
 func printCells(cols map[int][]int) {
-	printMonths()
+	// Find the oldest (max) week index present
+	lastWeek := 0
+	for w := range cols {
+		if w > lastWeek {
+			lastWeek = w
+		}
+	}
 
-	// rows: Sun(0) .. Sat(6) rendered top→bottom as in your original
+	printMonths(lastWeek)
+
+	// Rows: Sun(0) .. Sat(6); Columns: oldest → current (left → right)
 	for row := 0; row <= 6; row++ {
-		// columns: from oldest week to current week (left→right)
-		for w := 0; w <= weeksInLastSixMonths()+1; w++ {
-			if w == 0 {
+		for w := lastWeek; w >= 0; w-- {
+			if w == lastWeek {
 				printDayCol(row)
 			}
 
 			if col, ok := cols[w]; ok && row < len(col) {
-				// Today highlight: current week is the last column,
-				// and today's row equals calculateOffset()
-				isToday := (w == 0 && row == calculateOffset()) // we render newest at w==0 below
+				isToday := (w == 0 && row == calculateOffset())
 				printCell(col[row], isToday)
 			} else {
 				printCell(0, false)
@@ -158,26 +160,24 @@ func getBeginningOfDay(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, t.Location())
 }
 
-func printMonths() {
-	start := getBeginningOfDay(time.Now()).
-		Add(-time.Duration(daysInLastSixMonths()) * 24 * time.Hour)
+func printMonths(lastWeek int) {
+	now := getBeginningOfDay(time.Now())
+	startOfThisWeek := now.AddDate(0, 0, -int(time.Now().Weekday()))
+	oldestSunday := startOfThisWeek.AddDate(0, 0, -7*lastWeek)
 
-	cur := start
-	curMonth := cur.Month()
+	fmt.Printf("     ") // left padding under day labels
 
-	fmt.Printf("         ")
-	for {
-		if cur.Month() != curMonth {
-			fmt.Printf("%s ", cur.Month().String()[:3])
-			curMonth = cur.Month()
+	curMonth := oldestSunday.Month()
+	weekSunday := oldestSunday
+
+	for w := lastWeek; w >= 0; w-- {
+		if weekSunday.Month() != curMonth || w == lastWeek {
+			fmt.Printf("%-4s", weekSunday.Month().String()[:3])
+			curMonth = weekSunday.Month()
 		} else {
 			fmt.Printf("    ")
 		}
-
-		cur = cur.Add(7 * 24 * time.Hour)
-		if cur.After(time.Now()) {
-			break
-		}
+		weekSunday = weekSunday.AddDate(0, 0, 7)
 	}
 	fmt.Printf("\n")
 }
@@ -204,14 +204,11 @@ func printDayCol(day int) {
 }
 
 // ProcessRepositories reads repo paths (from your dotfile helpers) and aggregates commit counts.
-// NOTE: GetDotfilePath and parseFileLinesToString are assumed to exist in your codebase.
 func ProcessRepositories(email string) map[int]int {
 	filePath := GetDotfilePath()
 	repos := parseFileLinesToString(filePath)
 
 	days := daysInLastSixMonths()
-
-	// Pre-size with a little extra to hold offset shift + safety margin
 	commits := make(map[int]int, days+14)
 	for i := 0; i <= days+14; i++ {
 		commits[i] = 0
